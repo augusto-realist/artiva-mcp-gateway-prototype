@@ -16,13 +16,21 @@ Worth updating the Runtime Flow doc's Phase A to match once this is confirmed �
 
 | | |
 | :---- | :---- |
-| **Implemented** | MCP server (`list_datasets`, `list_tables`, `query` tools), Okta token verification via JWKS, the WIF/STS token exchange (`federation.py`), a BigQuery client that runs as either the federated user or your own local `gcloud` identity |
-| **Deferred / not built here** | Deployment (Dockerfile, Cloud Run) — this only runs locally; **token caching** — the WIF exchange currently re-runs on every single tool call rather than caching the ~1hr Google token, which the Runtime Flow doc flagged as an open decision, not yet made; production-grade session/credential storage |
+| **Implemented** | MCP server (`list_datasets`, `list_tables`, `query` tools), Okta token verification via JWKS, the WIF/STS token exchange (`federation.py`), a BigQuery client that runs as either the federated user or your own local `gcloud` identity, a `Dockerfile`, and Terraform (`terraform/`) that deploys this to Cloud Run in a personal sandbox project — live-tested end to end over the public internet |
+| **Deferred / not built here** | **Token caching** — the WIF exchange currently re-runs on every single tool call rather than caching the ~1hr Google token, which the Runtime Flow doc flagged as an open decision, not yet made; production-grade session/credential storage; wiring any of this into `gcp-foundation-artiva` or Artiva's real GCP project |
+
+## Deployed to Cloud Run (personal sandbox, not Artiva)
+
+`terraform/` stands this up in a throwaway free-tier GCP project — see `../Notes/GCP Sandbox/Commands Run - Sandbox Setup.md` and `../History/STATUS.md` for how that project was set up. `terraform plan`/`apply` there creates: the Artifact Registry repo, a dedicated service account, and the Cloud Run service itself (bootstrapped against Google's public placeholder image so the service can exist before a real one is built, then repointed at the real image via `gcloud builds submit` + another `apply`).
+
+**One non-obvious bug worth knowing if you redeploy this anywhere**: `mcp.streamable_http_app()` has its own `host` parameter (separate from whatever uvicorn binds to) that defaults to `"127.0.0.1"` and silently auto-scopes DNS-rebinding Host-header protection to just that address — any real deployment gets a cryptic "Invalid Host header" / HTTP 421 on every request. `server.py` now passes `transport_security` explicitly: disabled entirely for `AUTH_MODE=local` (that mode has no request-level auth of its own anyway — see `terraform/cloud_run.tf`'s `public_invoker` comment), and properly scoped to `PUBLIC_URL`'s hostname once `AUTH_MODE=okta` is in play.
+
+**Also worth knowing**: Cloud Run pins to the exact image string you give it. Pushing a new image over the *same* tag does not trigger a new revision — Terraform only diffs the string, so it sees no change. Use a new tag (or a fully automated CI pipeline that always does) for every real deploy.
 
 ## Setup
 
 ```bash
-cd mcp-gateway-prototype
+cd artiva-mcp-gateway-prototype
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 cp .env.example .env
@@ -80,6 +88,8 @@ src/
   bigquery_tools.py  BigQuery client + the three tool implementations
   server.py          wires it all into an MCPServer, exposes the ASGI app
 run.py               uvicorn entrypoint
+Dockerfile            builds the container Cloud Run runs
+terraform/            Artifact Registry + Cloud Run + IAM for the sandbox deployment
 ```
 
 ## IDE note

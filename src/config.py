@@ -8,13 +8,6 @@ from dotenv import load_dotenv
 load_dotenv()
 
 
-def _bool(name: str, default: bool) -> bool:
-    value = os.environ.get(name)
-    if value is None:
-        return default
-    return value.strip().lower() in ("1", "true", "yes", "on")
-
-
 @dataclass(frozen=True)
 class Settings:
     # "local": no auth, BigQuery via the developer's own `gcloud auth
@@ -38,8 +31,18 @@ class Settings:
     bq_project_id: str | None = os.environ.get("BQ_PROJECT_ID")
     bq_row_limit: int = int(os.environ.get("BQ_ROW_LIMIT", "500"))
 
-    gateway_host: str = os.environ.get("GATEWAY_HOST", "127.0.0.1")
-    gateway_port: int = int(os.environ.get("GATEWAY_PORT", "8080"))
+    # 0.0.0.0 works for both local dev and Cloud Run (which refuses anything
+    # bound only to 127.0.0.1). Cloud Run injects PORT itself at runtime, so
+    # that takes precedence over GATEWAY_PORT when both are present.
+    gateway_host: str = os.environ.get("GATEWAY_HOST", "0.0.0.0")
+    gateway_port: int = int(os.environ.get("PORT", os.environ.get("GATEWAY_PORT", "8080")))
+
+    # The URL the outside world reaches this server at -- distinct from
+    # gateway_host/port above, which is only what the process binds to
+    # locally (0.0.0.0 is not a usable public address). Only needed once
+    # AUTH_MODE=okta; defaults to a localhost guess that's fine for local
+    # testing but must be set to the real Cloud Run URL once deployed.
+    public_url: str = os.environ.get("PUBLIC_URL", "http://127.0.0.1:8080")
 
 
 settings = Settings()
