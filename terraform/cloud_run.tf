@@ -12,11 +12,39 @@ resource "google_cloud_run_v2_service" "gateway" {
 
       env {
         name  = "AUTH_MODE"
-        value = "local"
+        value = var.auth_mode
       }
       env {
         name  = "BQ_PROJECT_ID"
         value = var.project_id
+      }
+      env {
+        name  = "OKTA_ISSUER"
+        value = var.okta_issuer
+      }
+      env {
+        name  = "OKTA_CLIENT_ID"
+        value = var.okta_client_id
+      }
+      env {
+        name  = "OKTA_GROUPS_CLAIM"
+        value = "groups"
+      }
+      env {
+        name  = "GCP_WORKFORCE_POOL_ID"
+        value = var.wif_pool_id
+      }
+      env {
+        name  = "GCP_WORKFORCE_PROVIDER_ID"
+        value = var.wif_provider_id
+      }
+      env {
+        name  = "GCP_BILLING_PROJECT"
+        value = var.project_id
+      }
+      env {
+        name  = "PUBLIC_URL"
+        value = var.gateway_public_url
       }
     }
   }
@@ -24,15 +52,15 @@ resource "google_cloud_run_v2_service" "gateway" {
   depends_on = [google_project_service.run]
 }
 
-# Sandbox-only, temporary: allows unauthenticated invocation so the MCP
-# client smoke test can hit the URL directly without also standing up
-# identity-token plumbing for the test itself. AUTH_MODE=local has no
-# authentication of its own either, so this Cloud Run service is, for now,
-# a genuinely open door to the sandbox project's BigQuery data -- acceptable
-# only because that data is disposable test rows in a throwaway project.
-# Revisit before Phase D (Okta) and never carry this into the real
-# deployment, where Claude's own connector auth plus AUTH_MODE=okta replace
-# the need for this entirely.
+# Stays allUsers even under AUTH_MODE=okta -- Claude reaches this endpoint
+# as an anonymous HTTP client (it has no Google-recognized identity of its
+# own), so restricting Cloud Run's own invoker IAM would block Claude
+# entirely regardless of auth mode. Once AUTH_MODE=okta, the real gate moves
+# to the application layer: OktaTokenVerifier rejects any request without a
+# genuine, signature-verified Okta token. Under AUTH_MODE=local specifically
+# (no application-layer auth either) this is still a genuinely open door,
+# acceptable only because the data is disposable sandbox rows -- never carry
+# AUTH_MODE=local + allUsers into the real deployment.
 resource "google_cloud_run_v2_service_iam_member" "public_invoker" {
   project  = google_cloud_run_v2_service.gateway.project
   location = google_cloud_run_v2_service.gateway.location

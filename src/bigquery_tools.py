@@ -31,6 +31,7 @@ def list_tables(dataset_id: str, google_access_token: str | None) -> list[str]:
 
 def run_query(sql: str, google_access_token: str | None) -> list[dict]:
     client = _client_for_token(google_access_token)
-    job = client.query(sql)
+    job_config = bigquery.QueryJobConfig(maximum_bytes_billed=settings.bq_max_bytes_billed)
+    job = client.query(sql, job_config=job_config)
     rows = job.result(max_results=settings.bq_row_limit)
     return [dict(row.items()) for row in rows]

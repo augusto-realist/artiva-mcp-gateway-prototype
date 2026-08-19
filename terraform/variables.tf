@@ -21,3 +21,39 @@ variable "image" {
   type    = string
   default = "us-docker.pkg.dev/cloudrun/container/hello"
 }
+
+variable "auth_mode" {
+  description = "AUTH_MODE for the gateway container -- \"local\" (no auth, ADC-based) or \"okta\" (real Resource-Server mode)."
+  type        = string
+  default     = "local"
+}
+
+variable "okta_issuer" {
+  description = "Okta custom authorization server issuer URI (see Notes/GCP Sandbox/Commands Run - Sandbox Setup.md)."
+  type        = string
+  default     = "https://integrator-5961269.okta.com/oauth2/default"
+}
+
+variable "okta_client_id" {
+  description = "Okta OIDC app's Client ID (not a secret -- OAuth client IDs are public identifiers)."
+  type        = string
+  default     = "0oa16kp2pmySF7Cje698"
+}
+
+variable "wif_provider_id" {
+  description = "Workforce Identity Provider ID inside wif_pool_id (see bigquery_iam.tf for wif_pool_id itself)."
+  type        = string
+  default     = "okta"
+}
+
+variable "gateway_public_url" {
+  description = <<-EOT
+    The Cloud Run service's own public URL, for AUTH_MODE=okta's
+    resource_server_url. Cloud Run assigns this once at first creation and
+    it stays stable across updates -- can't self-reference the service's own
+    .uri attribute from within its own resource block (circular), so this is
+    hardcoded from the already-known deployed URL rather than computed.
+  EOT
+  type    = string
+  default = "https://artiva-mcp-gateway-ui6mrc63ra-uw.a.run.app"
+}
