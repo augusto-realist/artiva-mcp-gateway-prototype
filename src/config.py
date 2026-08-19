@@ -30,6 +30,11 @@ class Settings:
     # BigQuery
     bq_project_id: str | None = os.environ.get("BQ_PROJECT_ID")
     bq_row_limit: int = int(os.environ.get("BQ_ROW_LIMIT", "500"))
+    # Hard ceiling on bytes scanned per query (BigQuery rejects the query
+    # outright if its estimate exceeds this, rather than running it) -- caps
+    # worst-case cost per request regardless of who's calling. 1GB default is
+    # generous for this sandbox's tiny tables but bounds real abuse cost.
+    bq_max_bytes_billed: int = int(os.environ.get("BQ_MAX_BYTES_BILLED", str(1_000_000_000)))
 
     # 0.0.0.0 works for both local dev and Cloud Run (which refuses anything
     # bound only to 127.0.0.1). Cloud Run injects PORT itself at runtime, so
