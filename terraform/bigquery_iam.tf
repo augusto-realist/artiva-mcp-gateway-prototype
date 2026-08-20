@@ -46,8 +46,11 @@ locals {
 # legacy-ACL workaround, and this needs carrying into gcp-foundation-artiva's
 # modules/bigquery-dataset / 03-curated.tf's artiva-rbac-bq module for real.
 resource "google_bigquery_dataset_iam_member" "wif_group_dataset_viewer_iam_member_test" {
-  project    = var.project_id
-  dataset_id = var.wif_test_dataset_id
+  project = var.project_id
+  # Referencing the dataset resource directly (bigquery.tf), not
+  # var.wif_test_dataset_id, so Terraform creates the dataset before
+  # attempting this grant on a from-scratch apply.
+  dataset_id = google_bigquery_dataset.mcp_sandbox.dataset_id
   role       = "roles/bigquery.dataViewer"
   member     = "iamMember:${local.wif_group_principal}"
 }

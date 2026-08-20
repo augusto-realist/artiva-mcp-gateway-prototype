@@ -4,6 +4,16 @@ resource "google_cloud_run_v2_service" "gateway" {
   location = var.region
   ingress  = "INGRESS_TRAFFIC_ALL"
 
+  # Declared explicitly (matching Cloud Run's own defaults: scale-to-zero,
+  # automatic mode) to stop a perpetual diff -- the API always reports real
+  # values for this block regardless of what's configured, and the
+  # provider's schema treats these fields as plain Optional rather than
+  # Optional+Computed, so an absent block gets re-populated from the API on
+  # every refresh and then diffed away again on every plan.
+  scaling {
+    min_instance_count = 0
+  }
+
   template {
     service_account = google_service_account.gateway.email
 
