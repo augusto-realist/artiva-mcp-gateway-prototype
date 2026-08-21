@@ -14,6 +14,10 @@ class Settings:
     #   application-default login` credentials. Works today, no Artiva inputs needed.
     # "okta": real Resource-Server mode -- verifies Okta-issued bearer tokens
     #   and performs the WIF exchange per request. Needs every value below.
+    # "okta_broker": this gateway acts as the OAuth authorization server Claude
+    #   talks to -- it constructs Claude's whole Okta login itself (with safe
+    #   scopes), sidestepping the interclient_access/device_sso scope conflict
+    #   Claude's own fixed OAuth request always hits. See oauth_broker.py.
     auth_mode: str = os.environ.get("AUTH_MODE", "local")
 
     # Okta -- see Implementation Plan Phase 1 "Need from Artiva"
@@ -21,6 +25,12 @@ class Settings:
     okta_client_id: str | None = os.environ.get("OKTA_CLIENT_ID")
     okta_audience: str | None = os.environ.get("OKTA_AUDIENCE")
     okta_groups_claim: str = os.environ.get("OKTA_GROUPS_CLAIM", "groups")
+    # Only needed for AUTH_MODE=okta_broker -- the gateway becomes a real Okta
+    # OAuth client itself (exchanging the authorization code Okta issues it),
+    # unlike AUTH_MODE=okta where the gateway never talks to Okta's /token
+    # endpoint at all. Not read from Terraform yet -- see oauth_broker.py's
+    # own note on deploying this for real.
+    okta_client_secret: str | None = os.environ.get("OKTA_CLIENT_SECRET")
 
     # Workforce Identity Federation -- Implementation Plan Phase 1.6
     gcp_workforce_pool_id: str | None = os.environ.get("GCP_WORKFORCE_POOL_ID")

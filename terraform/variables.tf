@@ -23,7 +23,7 @@ variable "image" {
 }
 
 variable "auth_mode" {
-  description = "AUTH_MODE for the gateway container -- \"local\" (no auth, ADC-based) or \"okta\" (real Resource-Server mode)."
+  description = "AUTH_MODE for the gateway container -- \"local\" (no auth, ADC-based), \"okta\" (real Resource-Server mode -- Claude talks to Okta directly), or \"okta_broker\" (this gateway acts as the OAuth authorization server instead, routing around Claude's scope-conflict issue with this Okta org -- see oauth_broker.py)."
   type        = string
   default     = "local"
 }
@@ -38,6 +38,21 @@ variable "okta_client_id" {
   description = "Okta OIDC app's Client ID (not a secret -- OAuth client IDs are public identifiers)."
   type        = string
   default     = "0oa16kp2pmySF7Cje698"
+}
+
+variable "okta_client_secret" {
+  description = <<-EOT
+    Okta OIDC app's client secret -- only needed for AUTH_MODE=okta_broker,
+    where this gateway becomes a real Okta OAuth client itself (exchanging
+    codes at Okta's /token endpoint), unlike AUTH_MODE=okta where the
+    gateway never talks to Okta's /token endpoint at all. A real secret,
+    unlike okta_client_id -- deliberately has no default, must be supplied
+    via -var or a (gitignored) terraform.tfvars. Full Secret Manager
+    integration would be the more robust choice beyond this sandbox.
+  EOT
+  type      = string
+  default   = null
+  sensitive = true
 }
 
 variable "wif_provider_id" {

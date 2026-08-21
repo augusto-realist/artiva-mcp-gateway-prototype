@@ -36,6 +36,16 @@ resource "google_cloud_run_v2_service" "gateway" {
         name  = "OKTA_CLIENT_ID"
         value = var.okta_client_id
       }
+      # Only emitted when set -- AUTH_MODE=local/okta don't need it, and
+      # leaving the variable unset for those modes means it's never even
+      # passed to Cloud Run, rather than passed as an empty string.
+      dynamic "env" {
+        for_each = var.okta_client_secret == null ? [] : [var.okta_client_secret]
+        content {
+          name  = "OKTA_CLIENT_SECRET"
+          value = env.value
+        }
+      }
       env {
         name  = "OKTA_GROUPS_CLAIM"
         value = "groups"
