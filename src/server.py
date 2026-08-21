@@ -3,20 +3,35 @@ from __future__ import annotations
 from urllib.parse import urlparse
 
 from mcp.server.auth.middleware.auth_context import get_access_token
-from mcp.server.auth.settings import AuthSettings
+from mcp.server.auth.settings import AuthSettings, ClientRegistrationOptions
 from mcp.server.mcpserver import MCPServer
 from mcp.server.transport_security import TransportSecuritySettings
+from starlette.routing import Route
 
 from . import bigquery_tools, federation
 from .auth_verifiers import OktaTokenVerifier
 from .config import settings
+from .oauth_broker import OKTA_CALLBACK_PATH, OktaBrokerProvider
 
 _server_kwargs: dict = {}
+_broker_provider: OktaBrokerProvider | None = None
 if settings.auth_mode == "okta":
     _server_kwargs["token_verifier"] = OktaTokenVerifier()
     _server_kwargs["auth"] = AuthSettings(
         issuer_url=settings.okta_issuer,
         resource_server_url=settings.public_url,
+    )
+elif settings.auth_mode == "okta_broker":
+    _broker_provider = OktaBrokerProvider()
+    _server_kwargs["auth_server_provider"] = _broker_provider
+    _server_kwargs["auth"] = AuthSettings(
+        # This gateway IS the authorization server in this mode, not Okta --
+        # see oauth_broker.py.
+        issuer_url=settings.public_url,
+        resource_server_url=settings.public_url,
+        client_registration_options=ClientRegistrationOptions(
+            enabled=True, valid_scopes=["bigquery"]
+        ),
     )
 
 mcp = MCPServer(
@@ -72,7 +87,7 @@ async def query(sql: str) -> list[dict]:
 # (see cloud_run.tf's public_invoker comment), so DNS-rebinding protection
 # isn't adding a real boundary here -- only properly scope and re-enable it
 # once AUTH_MODE=okta gives us a stable PUBLIC_URL to allowlist.
-if settings.auth_mode == "okta":
+if settings.auth_mode in ("okta", "okta_broker"):
     _public_host = urlparse(settings.public_url).hostname or "127.0.0.1"
     _transport_security = TransportSecuritySettings(
         enable_dns_rebinding_protection=True,
@@ -83,3 +98,10 @@ else:
     _transport_security = TransportSecuritySettings(enable_dns_rebinding_protection=False)
 
 app = mcp.streamable_http_app(transport_security=_transport_security)
+
+# Not one of the SDK's own auto-wired auth routes (/authorize, /token,
+# /register) -- this is the extra handler OAuthAuthorizationServerProvider's
+# own docstring says a broker-style implementation has to add itself, to
+# receive Okta's redirect (step 4 in oauth_broker.py's diagram).
+if _broker_provider is not None:
+    app.routes.append(Route(OKTA_CALLBACK_PATH, endpoint=_broker_provider.handle_okta_callback, methods=["GET"]))
