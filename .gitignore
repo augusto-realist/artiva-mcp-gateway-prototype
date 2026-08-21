@@ -9,5 +9,9 @@ __pycache__/
 terraform/.terraform/
 terraform/*.tfstate
 terraform/*.tfstate.backup
+# `terraform state mv`/`state rm` write their own timestamped backups
+# (terraform.tfstate.<unix-timestamp>.backup) that the pattern above doesn't
+# match -- found missing during the Fabric restructure's state migration.
+terraform/terraform.tfstate.*.backup
 terraform/*.tfplan
 terraform/terraform.tfvars
