@@ -40,21 +40,6 @@ variable "okta_client_id" {
   default     = "0oa16kp2pmySF7Cje698"
 }
 
-variable "okta_client_secret" {
-  description = <<-EOT
-    Okta OIDC app's client secret -- only needed for AUTH_MODE=okta_broker,
-    where this gateway becomes a real Okta OAuth client itself (exchanging
-    codes at Okta's /token endpoint), unlike AUTH_MODE=okta where the
-    gateway never talks to Okta's /token endpoint at all. A real secret,
-    unlike okta_client_id -- deliberately has no default, must be supplied
-    via -var or a (gitignored) terraform.tfvars. Full Secret Manager
-    integration would be the more robust choice beyond this sandbox.
-  EOT
-  type      = string
-  default   = null
-  sensitive = true
-}
-
 variable "wif_provider_id" {
   description = "Workforce Identity Provider ID inside wif_pool_id (see bigquery_iam.tf for wif_pool_id itself)."
   type        = string
