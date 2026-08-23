@@ -15,3 +15,12 @@ terraform/*.tfstate.backup
 terraform/terraform.tfstate.*.backup
 terraform/*.tfplan
 terraform/terraform.tfvars
+# Per-workspace state (`terraform workspace new`) -- same sensitivity as the
+# default state file above. Found missing during the fresh-project
+# reproducibility test (2026-08-21), which introduced workspaces.
+terraform/terraform.tfstate.d/
+# Disposable, project-specific -var-file scratch files from running
+# Notes/GCP Sandbox/Fresh Project Reproducibility Test.md -- real project
+# IDs baked in, not meant to be reusable/committed. See that doc for the
+# real, sanitized command/template.
+terraform/new-project*.tfvars

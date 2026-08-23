@@ -29,14 +29,33 @@ resource "google_iam_workforce_pool_provider" "okta" {
   oidc {
     issuer_uri = var.okta_issuer
     client_id  = var.okta_client_id
-    # Required by the provider whenever an `oidc` block is present, but not
-    # actually exercised by this gateway -- it governs signing into the
-    # Google Cloud Console via this identity provider, which nothing here
-    # uses. The STS token-exchange federation.py performs doesn't touch
-    # this config at all.
+    # Confirmed required by Google's own API (not just a `gcloud` CLI quirk,
+    # as first assumed) -- creating a provider without this block fails with
+    # "Missing OIDC web single sign-on config", tested directly against a
+    # from-scratch pool during the fresh-project reproducibility test
+    # (2026-08-21). Not actually exercised by this gateway either way -- it
+    # governs signing into the Google Cloud Console via this IdP, unrelated
+    # to the STS token-exchange federation.py performs.
     web_sso_config {
       response_type             = "CODE"
       assertion_claims_behavior = "ONLY_ID_TOKEN_CLAIMS"
+    }
+
+    # Also confirmed required by the API at CREATION time specifically (a
+    # brand-new provider fails with "Missing OIDC Client Secret" without
+    # this) -- only discovered because this module had only ever been used
+    # against an *imported* provider before, where the secret already
+    # existed on Google's side and didn't need to be resupplied. Optional
+    # here (var.okta_client_secret defaults to null) so the imported,
+    # already-live provider (which ignores drift on this field below) never
+    # needs it -- only a genuine from-scratch creation does.
+    dynamic "client_secret" {
+      for_each = var.okta_client_secret == null ? [] : [var.okta_client_secret]
+      content {
+        value {
+          plain_text = client_secret.value
+        }
+      }
     }
   }
 
