@@ -28,3 +28,17 @@ resource "google_project_service" "secret_manager" {
   service            = "secretmanager.googleapis.com"
   disable_on_destroy = false
 }
+
+# The original sandbox project already had this enabled by the time this
+# Terraform started managing it -- never surfaced as a dependency until the
+# fresh-project reproducibility test (2026-08-21) hit a real failure: the
+# Compute Engine default service account
+# ({project_number}-compute@developer.gserviceaccount.com, referenced in
+# 03-run.tf's Cloud Build IAM grant) doesn't exist on a truly fresh project
+# until this API is actually enabled -- it's not auto-provisioned at project
+# creation.
+resource "google_project_service" "compute" {
+  project            = var.project_id
+  service            = "compute.googleapis.com"
+  disable_on_destroy = false
+}

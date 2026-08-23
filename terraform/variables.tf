@@ -40,6 +40,22 @@ variable "okta_client_id" {
   default     = "0oa16kp2pmySF7Cje698"
 }
 
+variable "okta_client_secret" {
+  description = <<-EOT
+    Okta OIDC app's client secret -- only needed when genuinely creating a
+    new Workforce Identity Pool Provider from scratch (Google's API requires
+    it at creation time; an already-imported provider ignores it entirely).
+    Leave unset for normal use against the existing sandbox. Deliberately
+    has no default -- pass via -var, never a committed .tfvars. See
+    modules/workforce-identity-federation/variables.tf for the full
+    explanation of why this is a genuine exception to this project's
+    "secrets never pass through Terraform" principle.
+  EOT
+  type      = string
+  default   = null
+  sensitive = true
+}
+
 variable "wif_pool_id" {
   description = "Workforce Identity Pool ID (created via modules/workforce-identity-federation)."
   type        = string

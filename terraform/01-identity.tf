@@ -49,6 +49,7 @@ module "workforce_identity" {
   description     = "Sandbox workforce pool for testing Okta-federated BigQuery access via the MCP gateway prototype"
   provider_display_name = "Okta (sandbox)"
   provider_description   = "Okta Integrator Free Plan trial, custom authorization server 'default'"
-  okta_issuer     = var.okta_issuer
-  okta_client_id  = var.okta_client_id
+  okta_issuer         = var.okta_issuer
+  okta_client_id      = var.okta_client_id
+  okta_client_secret  = var.okta_client_secret
 }

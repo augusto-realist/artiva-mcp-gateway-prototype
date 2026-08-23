@@ -18,6 +18,13 @@ resource "google_project_iam_member" "compute_default_sa_cloud_build_builder" {
   project = var.project_id
   role    = "roles/cloudbuild.builds.builder"
   member  = "serviceAccount:${data.google_project.current.number}-compute@developer.gserviceaccount.com"
+
+  # The account this grants a role to doesn't exist until Compute Engine's
+  # API is actually enabled (00-apis.tf) -- on the original sandbox this was
+  # already true by the time Terraform started managing it, so this
+  # dependency never had to be explicit until a genuinely fresh project
+  # exposed it.
+  depends_on = [google_project_service.compute]
 }
 
 module "images" {
@@ -69,6 +76,12 @@ module "gateway" {
   service_account        = google_service_account.gateway.email
   service_account_create = false
   ingress                = "INGRESS_TRAFFIC_ALL"
+  # Cloud Run's own API defaults this on for new services. This gateway is
+  # meant to be disposable/recreatable, matching everything else in this
+  # sandbox -- found blocking a cleanup-and-retry during the fresh-project
+  # reproducibility test (2026-08-21) when a prior failed apply left a
+  # partially-created service behind.
+  deletion_protection = "false"
 
   revision = {
     min_instance_count = 0
