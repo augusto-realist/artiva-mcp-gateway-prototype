@@ -23,7 +23,7 @@ variable "image" {
 }
 
 variable "auth_mode" {
-  description = "AUTH_MODE for the gateway container -- \"local\" (no auth, ADC-based), \"okta\" (real Resource-Server mode -- Claude talks to Okta directly), or \"okta_broker\" (this gateway acts as the OAuth authorization server instead, routing around Claude's scope-conflict issue with this Okta org -- see oauth_broker.py)."
+  description = "AUTH_MODE for the gateway container -- \"local\" (no auth, ADC-based), \"okta\" (real Resource-Server mode -- Claude talks to Okta directly), or \"okta_broker\" (this gateway acts as the OAuth authorization server instead, routing around Claude's scope-conflict issue with this Okta org -- see src/oauth_broker.py)."
   type        = string
   default     = "local"
 }
@@ -40,15 +40,39 @@ variable "okta_client_id" {
   default     = "0oa16kp2pmySF7Cje698"
 }
 
+variable "wif_pool_id" {
+  description = "Workforce Identity Pool ID (created via modules/workforce-identity-federation)."
+  type        = string
+  default     = "artiva-sandbox"
+}
+
+variable "wif_pool_parent" {
+  description = "GCP organization resource name the workforce pool is scoped under (see `gcloud organizations list`)."
+  type        = string
+  default     = "organizations/328174304569"
+}
+
 variable "wif_provider_id" {
-  description = "Workforce Identity Provider ID inside wif_pool_id (see bigquery_iam.tf for wif_pool_id itself)."
+  description = "Workforce Identity Provider ID inside wif_pool_id."
   type        = string
   default     = "okta"
 }
 
+variable "wif_test_group" {
+  description = "Okta group name to grant sandbox BigQuery access to, via the WIF pool's principalSet."
+  type        = string
+  default     = "artiva-clinical-test"
+}
+
+variable "wif_test_dataset_id" {
+  description = "The sandbox BigQuery dataset's real name (also its Terraform resource's dataset_id)."
+  type        = string
+  default     = "mcp_sandbox"
+}
+
 variable "gateway_public_url" {
   description = <<-EOT
-    The Cloud Run service's own public URL, for AUTH_MODE=okta's
+    The Cloud Run service's own public URL, for AUTH_MODE=okta/okta_broker's
     resource_server_url. Cloud Run assigns this once at first creation and
     it stays stable across updates -- can't self-reference the service's own
     .uri attribute from within its own resource block (circular), so this is
