@@ -8,15 +8,17 @@ It was built and smoke-tested against the real, currently-installed `mcp` Python
 
 The earlier Runtime Flow doc described the gateway itself hosting `/authorize` and `/callback` and brokering the Okta redirect on Claude's behalf (a "the gateway IS the OAuth server" model). Building against the real SDK surfaced a cleaner, SDK-idiomatic alternative that this prototype uses instead: the gateway acts as a pure **MCP Resource Server** — it advertises Okta as the external Authorization Server (via `AuthSettings(issuer_url=...)`), and Claude completes the OAuth login **directly against Okta**, then sends the resulting Okta token straight through as the bearer token on every call. The gateway never runs `/authorize`/`/callback` itself; it only verifies whatever token Okta already issued.
 
-This removes an entire layer of custom code (no session store, no redirect-brokering routes) and matches what the current MCP authorization spec is built around. **The one thing this doesn't verify:** whether Claude's custom-connector OAuth flow and Okta's app-integration settings are actually compatible end to end (e.g., whether Okta needs Dynamic Client Registration enabled, or a pre-registered static OAuth client for Claude) — that can only be confirmed once real Okta credentials exist. If it turns out Claude needs the older broker pattern instead, `auth_verifiers.py`/`server.py` are the two files that would change; the BigQuery and WIF-exchange logic (`federation.py`, `bigquery_tools.py`) stays the same either way.
+This removes an entire layer of custom code (no session store, no redirect-brokering routes) and matches what the current MCP authorization spec is built around. **Update (2026-08-21): it turned out this doesn't work against this sandbox's specific Okta org** — Claude's connector always requests two scopes (`interclient_access`, `device_sso`) that this org treats as permanently mutually exclusive, rejecting the request before any login screen appears. See `../Notes/Claude-Okta Connector Issue - Summary & Path Forward.md` for the full investigation.
 
-Worth updating the Runtime Flow doc's Phase A to match once this is confirmed — flagging here rather than silently changing that doc.
+**The broker pattern is now built, as `AUTH_MODE=okta_broker`** (`src/oauth_broker.py`) — the gateway itself becomes the OAuth authorization server the client talks to, constructing the Okta login request itself (with safe scopes) instead of letting Claude do it. Verified end to end with `scripts/manual_broker_test.py`: real Dynamic Client Registration, a real interactive Okta login, and a real MCP call with the resulting token — all working. Built directly on the `mcp` SDK's own `OAuthAuthorizationServerProvider` interface, not hand-rolled; the BigQuery and WIF-exchange logic (`federation.py`, `bigquery_tools.py`) required zero changes, and `AUTH_MODE=local`/`okta` are untouched. What's not yet confirmed: whether Claude's own connector completes this flow identically to the test script — that needs a real deployment to test.
+
+Worth updating the Runtime Flow doc's Phase A to match once that's confirmed — flagging here rather than silently changing that doc.
 
 ## What's implemented vs. deferred
 
 | | |
 | :---- | :---- |
-| **Implemented** | MCP server (`list_datasets`, `list_tables`, `query` tools), Okta token verification via JWKS, the WIF/STS token exchange (`federation.py`), a BigQuery client that runs as either the federated user or your own local `gcloud` identity, a `Dockerfile`, and Terraform (`terraform/`) that deploys this to Cloud Run in a personal sandbox project — live-tested end to end over the public internet |
+| **Implemented** | MCP server (`list_datasets`, `list_tables`, `query` tools), Okta token verification via JWKS, an OAuth broker mode (`oauth_broker.py`) that routes around Claude's scope-conflict issue with this Okta org, the WIF/STS token exchange (`federation.py`), a BigQuery client that runs as either the federated user or your own local `gcloud` identity, a `Dockerfile`, and Terraform (`terraform/`) that deploys this to Cloud Run in a personal sandbox project — live-tested end to end over the public internet |
 | **Deferred / not built here** | **Token caching** — the WIF exchange currently re-runs on every single tool call rather than caching the ~1hr Google token, which the Runtime Flow doc flagged as an open decision, not yet made; production-grade session/credential storage; wiring any of this into `gcp-foundation-artiva` or Artiva's real GCP project |
 
 ## Deployed to Cloud Run (personal sandbox, not Artiva)
@@ -84,12 +86,13 @@ Needs every value in `.env.example`'s Okta and WIF sections. Two ways to get the
 src/
   config.py          settings, all env-driven
   auth_verifiers.py  OktaTokenVerifier -- verifies a bearer token against Okta's JWKS
+  oauth_broker.py    AUTH_MODE=okta_broker -- gateway acts as its own OAuth authorization server
   federation.py       the WIF/STS token exchange (Google's sts.googleapis.com/v1/token)
   bigquery_tools.py  BigQuery client + the three tool implementations
   server.py          wires it all into an MCPServer, exposes the ASGI app
 run.py               uvicorn entrypoint
 Dockerfile            builds the container Cloud Run runs
-terraform/            Artifact Registry + Cloud Run + IAM for the sandbox deployment
+terraform/            Artifact Registry + Cloud Run + BigQuery + WIF + IAM for the sandbox deployment
 ```
 
 ## IDE note

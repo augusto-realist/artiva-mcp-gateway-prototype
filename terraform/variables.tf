@@ -23,7 +23,7 @@ variable "image" {
 }
 
 variable "auth_mode" {
-  description = "AUTH_MODE for the gateway container -- \"local\" (no auth, ADC-based) or \"okta\" (real Resource-Server mode)."
+  description = "AUTH_MODE for the gateway container -- \"local\" (no auth, ADC-based), \"okta\" (real Resource-Server mode -- Claude talks to Okta directly), or \"okta_broker\" (this gateway acts as the OAuth authorization server instead, routing around Claude's scope-conflict issue with this Okta org -- see oauth_broker.py)."
   type        = string
   default     = "local"
 }

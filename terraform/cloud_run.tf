@@ -36,6 +36,23 @@ resource "google_cloud_run_v2_service" "gateway" {
         name  = "OKTA_CLIENT_ID"
         value = var.okta_client_id
       }
+      # Only emitted for okta_broker (the only mode that needs it), and
+      # sourced from Secret Manager -- the real value is never a Terraform
+      # variable/plan output, and never appears as a plain Cloud Run env var
+      # value; Cloud Run resolves it at container-start time instead. See
+      # secrets.tf.
+      dynamic "env" {
+        for_each = var.auth_mode == "okta_broker" ? [1] : []
+        content {
+          name = "OKTA_CLIENT_SECRET"
+          value_source {
+            secret_key_ref {
+              secret  = google_secret_manager_secret.okta_client_secret.secret_id
+              version = "latest"
+            }
+          }
+        }
+      }
       env {
         name  = "OKTA_GROUPS_CLAIM"
         value = "groups"
@@ -59,7 +76,10 @@ resource "google_cloud_run_v2_service" "gateway" {
     }
   }
 
-  depends_on = [google_project_service.run]
+  # The IAM grant matters here, not just the secret existing -- without it,
+  # Cloud Run can create the revision but the container fails at startup
+  # trying to actually read the secret.
+  depends_on = [google_project_service.run, google_secret_manager_secret_iam_member.gateway_secret_accessor]
 }
 
 # Stays allUsers even under AUTH_MODE=okta -- Claude reaches this endpoint
