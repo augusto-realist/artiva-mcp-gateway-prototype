@@ -186,11 +186,25 @@ class OktaBrokerProvider(OAuthAuthorizationServerProvider[AuthorizationCode, Ref
         if entry is None:
             raise TokenError(error="invalid_grant", error_description="Authorization code already used or expired")
         _, okta_id_token = entry
+
+        # Read the token's own real `exp` claim rather than assuming a fixed
+        # lifetime -- confirmed empirically (2026-08-23) that this Okta org's
+        # actual configured lifetime is 3600s, but nothing ties that to a
+        # hardcoded number; if Okta's configuration ever changed, or a
+        # different Okta org (e.g. Artiva's real one) used a different
+        # lifetime, a hardcoded value would silently be wrong. Reuses
+        # verify_okta_id_token rather than a fresh unverified decode, since
+        # this token was just obtained from Okta's own /token endpoint
+        # moments ago -- verifying it again is cheap and keeps this on the
+        # same trusted code path as every later tool call.
+        verified = verify_okta_id_token(okta_id_token)
+        expires_in = max(0, int(verified.expires_at - time.time())) if verified and verified.expires_at else 3600
+
         # No refresh_token issued -- a real, documented limitation for now.
-        # Okta ID tokens are short-lived (~1hr); once one expires, Claude has
-        # to redo the login rather than silently refresh. Fine for proving
-        # the flow; worth revisiting before this is anything but a sandbox.
-        return OAuthToken(access_token=okta_id_token, token_type="Bearer", expires_in=3600, scope="bigquery")
+        # Once this expires, Claude has to redo the login rather than
+        # silently refresh. Fine for proving the flow; worth revisiting
+        # before this is anything but a sandbox.
+        return OAuthToken(access_token=okta_id_token, token_type="Bearer", expires_in=expires_in, scope="bigquery")
 
     # -- Verifying the token on every later tool call (this IS the real
     # Okta ID token from exchange_authorization_code above, unchanged) -----
